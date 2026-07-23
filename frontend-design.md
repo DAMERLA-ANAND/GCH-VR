@@ -1,4 +1,4 @@
-# Frontend Specific Design Document
+# Frontend Speciific Design Document
 
 > **System**: Dispute Resolution Platform Web Frontends  
 > **Framework**: React 18 / TypeScript / Vite  
