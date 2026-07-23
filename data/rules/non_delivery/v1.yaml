@@ -1,0 +1,25 @@
+category: NON_DELIVERY
+version: v1.0
+rules:
+  - id: ND-001
+    name: tracking_confirms_delivery
+    description: Tracking shows delivered to cardmember address
+    conditions:
+      - field: merchant.evidence.TRACKING.extracted_fields.delivery_status
+        operator: eq
+        value: DELIVERED
+    outcome: MERCHANT_WIN
+    weight: 0.5
+    explanation_template: Carrier tracking confirms delivery on {delivery_date}.
+  - id: ND-002
+    name: missing_tracking
+    description: Merchant has no tracking evidence
+    conditions:
+      - field: merchant.evidence.TRACKING
+        operator: not_exists
+    outcome: CARDMEMBER_WIN
+    weight: 0.6
+    explanation_template: No tracking evidence was submitted.
+gemini_fallback:
+  enabled: true
+  confidence_threshold: 0.85

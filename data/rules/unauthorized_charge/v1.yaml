@@ -1,0 +1,25 @@
+category: UNAUTHORIZED_CHARGE
+version: v1.0
+rules:
+  - id: UC-001
+    name: cardholder_authorized
+    description: Merchant evidence shows authorization
+    conditions:
+      - field: merchant.evidence.ORDER_CONFIRMATION.extracted_fields.authorization_flag
+        operator: eq
+        value: true
+    outcome: MERCHANT_WIN
+    weight: 0.55
+    explanation_template: Order confirmation shows the charge was authorized.
+  - id: UC-002
+    name: missing_authorization
+    description: No evidence of cardholder authorization
+    conditions:
+      - field: merchant.evidence.ORDER_CONFIRMATION
+        operator: not_exists
+    outcome: CARDMEMBER_WIN
+    weight: 0.6
+    explanation_template: No authorization evidence was submitted.
+gemini_fallback:
+  enabled: true
+  confidence_threshold: 0.85
