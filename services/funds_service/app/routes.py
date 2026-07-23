@@ -10,7 +10,8 @@ router = APIRouter(prefix="/internal/v1/funds", tags=["funds-service"])
 
 @router.post("/hold")
 async def hold_funds(payload: dict[str, object]) -> dict[str, object]:
-    dispute_id = payload["dispute_id"]
+    from uuid import UUID
+    dispute_id = UUID(str(payload["dispute_id"]))
     dispute = STORE.disputes[dispute_id]
     existing = next((hold for hold in STORE.funds_holds.values() if hold.dispute_id == dispute.id), None)
     if existing:
@@ -29,7 +30,8 @@ async def hold_funds(payload: dict[str, object]) -> dict[str, object]:
 
 @router.post("/release")
 async def release_funds(payload: dict[str, object]) -> dict[str, object]:
-    dispute_id = payload["dispute_id"]
+    from uuid import UUID
+    dispute_id = UUID(str(payload["dispute_id"]))
     direction = payload.get("direction", "TO_CARDMEMBER")
     hold = next(hold for hold in STORE.funds_holds.values() if hold.dispute_id == dispute_id)
     if direction == "TO_CARDMEMBER":
@@ -39,3 +41,4 @@ async def release_funds(payload: dict[str, object]) -> dict[str, object]:
     hold.released_at = STORE.now()
     STORE.sync_to_db()
     return {"hold_id": str(hold.id), "status": hold.status.value, "released_at": hold.released_at}
+

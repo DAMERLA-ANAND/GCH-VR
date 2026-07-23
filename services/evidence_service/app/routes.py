@@ -52,7 +52,11 @@ async def list_evidence(dispute_id: str) -> dict[str, object]:
 
 @router.get("/evidence/{evidence_id}/download")
 async def download_evidence(evidence_id: str) -> dict[str, object]:
-    evidence = STORE.evidence.get(evidence_id)
+    try:
+        evidence = STORE.evidence.get(UUID(evidence_id))
+    except ValueError:
+        evidence = None
     if evidence is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence not found")
     return create_signed_url(evidence.gcs_uri)
+

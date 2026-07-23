@@ -18,15 +18,28 @@ class RuleEvaluator:
             for condition in rule.conditions:
                 extracted = self._resolve_field(dispute_data, evidence_summaries, condition.field)
                 if condition.operator == "eq":
-                    matched = extracted == condition.value
+                    matched = str(extracted).lower() == str(condition.value).lower() if extracted is not None else False
+                elif condition.operator == "neq":
+                    matched = str(extracted).lower() != str(condition.value).lower() if extracted is not None else True
                 elif condition.operator == "exists":
                     matched = extracted is not None
                 elif condition.operator == "not_exists":
                     matched = extracted is None
-                elif condition.operator == ">=":
+                elif condition.operator in {">=", "gte"}:
                     matched = extracted is not None and float(extracted) >= float(condition.value)
+                elif condition.operator in {"<=", "lte"}:
+                    matched = extracted is not None and float(extracted) <= float(condition.value)
+                elif condition.operator in {">", "gt"}:
+                    matched = extracted is not None and float(extracted) > float(condition.value)
+                elif condition.operator in {"<", "lt"}:
+                    matched = extracted is not None and float(extracted) < float(condition.value)
+                elif condition.operator == "contains":
+                    matched = str(condition.value).lower() in str(extracted).lower() if extracted is not None else False
+                elif condition.operator == "fuzzy_match":
+                    matched = True if extracted is not None else False
                 else:
                     matched = False
+
                 if not matched:
                     break
             if matched:

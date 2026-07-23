@@ -1,5 +1,5 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+
 import AdminRules from './pages/AdminRules';
 import AdminAppeals from './pages/AdminAppeals';
 import DisputesDashboard from './pages/DisputesDashboard';

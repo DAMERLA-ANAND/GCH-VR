@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from ..common.database import STORE
@@ -14,11 +15,21 @@ from .app.routes_mediated import router as mediated_router
 from .app.services import DisputeService
 
 app = FastAPI(title="Dispute Service", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 telemetry = get_telemetry("dispute-service")
 service = DisputeService()
 app.include_router(disputes_router)
 app.include_router(appeals_router)
 app.include_router(mediated_router)
+
 
 
 @app.exception_handler(HTTPException)
