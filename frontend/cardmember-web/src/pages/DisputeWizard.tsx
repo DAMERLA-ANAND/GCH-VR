@@ -110,8 +110,9 @@ export default function DisputeWizard() {
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Description of Dispute</label>
+          <label htmlFor="dispute-description" className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Description of Dispute</label>
           <textarea
+            id="dispute-description"
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
