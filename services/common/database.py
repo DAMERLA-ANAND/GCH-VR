@@ -15,6 +15,7 @@ from .schemas import (
     AppealOutcome,
     AppealStatus,
     AuditLogRecord,
+    CategoryRecord,
     Dispute,
     DisputeCategory,
     DisputeStatus,
@@ -53,6 +54,7 @@ class InMemoryStore:
         self.notifications: dict[UUID, NotificationRecord] = {}
         self.audit_logs: dict[UUID, AuditLogRecord] = {}
         self.audit_events: list[dict[str, Any]] = []
+        self.categories: dict[str, CategoryRecord] = {}
         self.rule_sets: dict[DisputeCategory, RuleSet] = {}
         self.transaction_map: dict[str, UUID] = {}
         self.current_time: datetime = datetime.now(timezone.utc)
@@ -65,6 +67,20 @@ class InMemoryStore:
         self.transactions.clear()
         self.notifications.clear()
         self.audit_logs.clear()
+
+        default_cats = [
+            ("NON_DELIVERY", "Non-Delivery of Goods / Services", "Merchant failed to deliver purchased items."),
+            ("UNAUTHORIZED_CHARGE", "Unauthorized / Fraudulent Charge", "Cardmember claims charge was not authorized."),
+            ("NOT_AS_DESCRIBED", "Item Not As Described / Defective", "Item received is significantly different or defective."),
+            ("DUPLICATE_CHARGE", "Duplicate Processing", "Transaction was billed multiple times."),
+            ("SUBSCRIPTION_CANCELED", "Recurring Charge After Cancellation", "Merchant charged subscription after cancellation."),
+            ("SERVICES_NOT_RENDERED", "Services Not Rendered", "Booked service or event was canceled/not provided."),
+            ("DAMAGED_GOODS", "Damaged / Broken Goods", "Items arrived damaged during shipping."),
+            ("INCORRECT_AMOUNT", "Incorrect Charge Amount", "Billed amount differs from authorized transaction receipt."),
+        ]
+        for code, name, desc in default_cats:
+            cat = CategoryRecord(code=code, display_name=name, description=desc)
+            self.categories[code] = cat
         cardmember = User(
             id=UUID("00000000-0000-0000-0000-000000000001"),
             type=UserRole.CARDMEMBER,

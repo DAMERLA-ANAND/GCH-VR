@@ -49,7 +49,6 @@ And it's broken for banks — because they're hemorrhaging money, staff time, an
 ---
 
 ## 🔴 SLIDE 3 — THE LOSSES (The Numbers Don't Lie)
-
 *[Slow down. Let each number land.]*
 
 "Here's what this costs in real terms.

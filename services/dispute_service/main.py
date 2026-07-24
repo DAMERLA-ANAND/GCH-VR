@@ -10,7 +10,9 @@ from ..common.database import STORE
 from ..common.observability import get_telemetry
 from ..common.schemas import ProblemDetail, UserRole
 from ..evidence_service.app.routes import router as evidence_router
+from .app.routes_admin import router as admin_router
 from .app.routes_appeals import router as appeals_router
+from .app.routes_auth import router as auth_router
 from .app.routes_disputes import router as disputes_router
 from .app.routes_mediated import router as mediated_router
 from .app.routes_transactions import router as transactions_router
@@ -28,6 +30,8 @@ app.add_middleware(
 
 telemetry = get_telemetry("dispute-service")
 service = DisputeService()
+app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(disputes_router)
 app.include_router(appeals_router)
 app.include_router(mediated_router)

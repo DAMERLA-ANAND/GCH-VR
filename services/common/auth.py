@@ -24,6 +24,15 @@ async def get_auth_context(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication context")
     if token.startswith("Bearer "):
         token = token.removeprefix("Bearer ")
+    if token.startswith("drp_token_"):
+        parts = token.split("_")
+        role_key = parts[2] if len(parts) > 2 else "cardmember"
+        if role_key in {"admin", "reviewer"}:
+            return AuthContext(role=UserRole.ADMIN, user_id=UUID("00000000-0000-0000-0000-000000000004"), email="admin@example.com")
+        elif role_key == "merchant":
+            return AuthContext(role=UserRole.MERCHANT, user_id=UUID("00000000-0000-0000-0000-000000000002"), merchant_id=UUID("00000000-0000-0000-0000-000000000002"), email="merchant@example.com")
+        else:
+            return AuthContext(role=UserRole.CARDMEMBER, user_id=UUID("00000000-0000-0000-0000-000000000001"), email="alice@example.com")
     if token.startswith("role="):
         values: dict[str, str] = {}
         for fragment in token.split(";"):

@@ -109,6 +109,51 @@ export const decideReview = async (appealId: string, outcome: 'UPHELD' | 'OVERTU
   return res.data;
 };
 
+export const fetchAdminCategories = async () => {
+  const client = getMerchantClient('ADMIN');
+  const res = await client.get('/api/v1/admin/categories');
+  return res.data;
+};
+
+export const createCategory = async (code: string, displayName: string, description: string) => {
+  const client = getMerchantClient('ADMIN');
+  const res = await client.post('/api/v1/admin/categories', {
+    code,
+    display_name: displayName,
+    description,
+  });
+  return res.data;
+};
+
+export const deleteCategory = async (code: string) => {
+  const client = getMerchantClient('ADMIN');
+  const res = await client.delete(`/api/v1/admin/categories/${code}`);
+  return res.data;
+};
+
+export const advanceDisputeStatus = async (disputeId: string, targetStatus: string, outcome?: string, explanation?: string) => {
+  const client = getMerchantClient('ADMIN');
+  const res = await client.post(`/api/v1/admin/disputes/${disputeId}/advance-status`, {
+    target_status: targetStatus,
+    outcome,
+    explanation,
+    trigger_ai: true,
+  });
+  return res.data;
+};
+
+export const fetchAdminTelemetry = async () => {
+  const client = getMerchantClient('ADMIN');
+  const res = await client.get('/api/v1/admin/telemetry');
+  return res.data;
+};
+
+export const loginUser = async (username: string, password: string) => {
+  const client = getMerchantClient('MERCHANT');
+  const res = await client.post('/api/v1/auth/login', { username, password });
+  return res.data;
+};
+
 export const seedDemoData = async () => {
   const client = getMerchantClient('MERCHANT');
   const res = await client.post('/api/v1/prototype/seed');

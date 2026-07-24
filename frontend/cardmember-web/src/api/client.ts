@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 export const cardmemberUserId = '00000000-0000-0000-0000-000000000001';
 
@@ -115,6 +115,21 @@ export const respondMediatedRequest = async (disputeId: string, requestId: strin
   const res = await apiClient.post(`/api/v1/disputes/${disputeId}/mediated-requests/${requestId}/respond`, {
     response_text: responseText,
   });
+  return res.data;
+};
+
+export const fetchDisputeEvidence = async (disputeId: string) => {
+  const res = await apiClient.get(`/api/v1/disputes/${disputeId}/evidence`);
+  return res.data;
+};
+
+export const fetchCategories = async () => {
+  const res = await apiClient.get('/api/v1/categories');
+  return res.data;
+};
+
+export const loginUser = async (username: string, password: string) => {
+  const res = await apiClient.post('/api/v1/auth/login', { username, password });
   return res.data;
 };
 

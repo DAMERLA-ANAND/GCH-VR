@@ -22,6 +22,12 @@ class UserRole(str, Enum):
 class DisputeCategory(str, Enum):
     NON_DELIVERY = "NON_DELIVERY"
     UNAUTHORIZED_CHARGE = "UNAUTHORIZED_CHARGE"
+    NOT_AS_DESCRIBED = "NOT_AS_DESCRIBED"
+    DUPLICATE_CHARGE = "DUPLICATE_CHARGE"
+    SUBSCRIPTION_CANCELED = "SUBSCRIPTION_CANCELED"
+    SERVICES_NOT_RENDERED = "SERVICES_NOT_RENDERED"
+    DAMAGED_GOODS = "DAMAGED_GOODS"
+    INCORRECT_AMOUNT = "INCORRECT_AMOUNT"
 
 
 class DisputeStatus(str, Enum):
@@ -39,7 +45,39 @@ class EvidenceType(str, Enum):
     TRACKING = "TRACKING"
     CHAT_LOG = "CHAT_LOG"
     ORDER_CONFIRMATION = "ORDER_CONFIRMATION"
+    REFUND_PROMISE = "REFUND_PROMISE"
+    TERMS_AND_CONDITIONS = "TERMS_AND_CONDITIONS"
+    EXPERT_APPRAISAL = "EXPERT_APPRAISAL"
     OTHER = "OTHER"
+
+
+class CategoryRecord(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    code: str
+    display_name: str
+    description: str
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class CategoryCreateRequest(BaseModel):
+    code: str
+    display_name: str
+    description: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user_id: UUID
+    role: UserRole
+    email: str
+    display_name: str
+    merchant_id: UUID | None = None
 
 
 class EvidenceSide(str, Enum):

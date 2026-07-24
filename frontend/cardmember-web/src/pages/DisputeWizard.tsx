@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { fileDispute, uploadEvidence } from '../api/client';
+import { fileDispute, uploadEvidence, fetchCategories } from '../api/client';
 
 export default function DisputeWizard() {
   const { transactionId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const [categories, setCategories] = useState<any[]>([]);
   const [category, setCategory] = useState(searchParams.get('category') || 'NON_DELIVERY');
   const [amount, setAmount] = useState(parseFloat(searchParams.get('amount') || '149.99'));
   const [description, setDescription] = useState('');
@@ -14,6 +15,16 @@ export default function DisputeWizard() {
   const [evidenceType, setEvidenceType] = useState('RECEIPT');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchCategories()
+      .then((res) => {
+        if (res.categories && res.categories.length > 0) {
+          setCategories(res.categories);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch dynamic categories', err));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,37 +72,40 @@ export default function DisputeWizard() {
       )}
 
       <form onSubmit={handleSubmit} className="bg-slate-800/60 backdrop-blur-lg border border-slate-700/80 p-6 rounded-2xl shadow-2xl space-y-6">
-        {/* Category Selection */}
+        {/* Dynamic Category Selection */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Dispute Category</label>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setCategory('NON_DELIVERY')}
-              className={`p-4 rounded-xl border text-left transition ${
-                category === 'NON_DELIVERY'
-                  ? 'bg-indigo-500/20 border-indigo-500 text-white font-semibold shadow-lg'
-                  : 'bg-slate-900/40 border-slate-700/80 text-slate-400 hover:border-slate-600'
-              }`}
-            >
-              <div className="text-lg mb-1">📦</div>
-              <div className="font-medium text-sm">Non-Delivery of Goods</div>
-              <div className="text-xs text-slate-400 mt-1 font-normal">Package or service ordered was not delivered.</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setCategory('UNAUTHORIZED_CHARGE')}
-              className={`p-4 rounded-xl border text-left transition ${
-                category === 'UNAUTHORIZED_CHARGE'
-                  ? 'bg-indigo-500/20 border-indigo-500 text-white font-semibold shadow-lg'
-                  : 'bg-slate-900/40 border-slate-700/80 text-slate-400 hover:border-slate-600'
-              }`}
-            >
-              <div className="text-lg mb-1">🛡️</div>
-              <div className="font-medium text-sm">Unauthorized Charge</div>
-              <div className="text-xs text-slate-400 mt-1 font-normal">Card charge was not authorized by account holder.</div>
-            </button>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+            Dispute Category (DB Loaded)
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {categories.length > 0 ? (
+              categories.map((cat) => (
+                <button
+                  key={cat.code}
+                  type="button"
+                  onClick={() => setCategory(cat.code)}
+                  className={`p-3.5 rounded-xl border text-left transition ${
+                    category === cat.code
+                      ? 'bg-indigo-500/20 border-indigo-500 text-white font-semibold shadow-lg'
+                      : 'bg-slate-900/40 border-slate-700/80 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="font-medium text-xs text-indigo-300 font-mono">{cat.code}</div>
+                  <div className="font-semibold text-xs text-slate-200 mt-0.5">{cat.display_name}</div>
+                  <div className="text-[11px] text-slate-400 mt-1 font-normal line-clamp-2">{cat.description}</div>
+                </button>
+              ))
+            ) : (
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white"
+              >
+                <option value="NON_DELIVERY">Non-Delivery of Goods</option>
+                <option value="UNAUTHORIZED_CHARGE">Unauthorized Charge</option>
+                <option value="NOT_AS_DESCRIBED">Item Not As Described</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -103,7 +117,7 @@ export default function DisputeWizard() {
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(parseFloat(e.target.value))}
-            className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
             required
           />
         </div>
@@ -116,8 +130,8 @@ export default function DisputeWizard() {
             rows={4}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Please detail what happened (e.g. Expected delivery date, vendor communication, tracking details)..."
-            className="w-full bg-slate-900/60 border border-slate-700 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="Please detail what happened..."
+            className="w-full bg-slate-900/60 border border-slate-700 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             required
           />
         </div>
@@ -129,12 +143,13 @@ export default function DisputeWizard() {
             <select
               value={evidenceType}
               onChange={(e) => setEvidenceType(e.target.value)}
-              className="bg-slate-900/60 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+              className="bg-slate-900/60 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
             >
               <option value="RECEIPT">Receipt / Invoice</option>
               <option value="ORDER_CONFIRMATION">Order Confirmation Email</option>
               <option value="CHAT_LOG">Communication Log</option>
               <option value="PHOTO">Photo Proof</option>
+              <option value="TERMS_AND_CONDITIONS">Terms & Conditions</option>
               <option value="OTHER">Other Document</option>
             </select>
 
@@ -144,9 +159,6 @@ export default function DisputeWizard() {
               className="text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-500/20 file:text-indigo-300 hover:file:bg-indigo-500/30"
             />
           </div>
-          {file && (
-            <p className="text-xs text-emerald-400 font-mono">Selected: {file.name} ({Math.round(file.size / 1024)} KB)</p>
-          )}
         </div>
 
         {/* Submit Action */}
@@ -154,7 +166,7 @@ export default function DisputeWizard() {
           <button
             type="submit"
             disabled={submitting}
-            className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50"
+            className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 text-sm"
           >
             {submitting ? 'Submitting Dispute...' : 'Submit Dispute'}
           </button>

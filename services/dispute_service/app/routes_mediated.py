@@ -35,8 +35,20 @@ async def respond_mediated_request(dispute_id: UUID, request_id: UUID, payload: 
     request_obj.response_text = payload.get("response_text")
     request_obj.response_gcs_uri = payload.get("response_gcs_uri")
     from ...common.schemas import MediatedRequestStatus
+    from ...common.events import record_audit_event
     request_obj.status = MediatedRequestStatus.RESPONDED
     request_obj.responded_at = STORE.now()
+    record_audit_event(
+        "MEDIATED_REQUEST_RESPONDED",
+        str(dispute_id),
+        str(auth.user_id),
+        auth.role.value,
+        {
+            "request_id": str(request_id),
+            "request_type": request_obj.request_type,
+            "response_text": request_obj.response_text,
+        },
+    )
     STORE.sync_to_db()
     return request_obj.model_dump()
 

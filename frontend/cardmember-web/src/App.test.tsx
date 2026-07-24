@@ -5,7 +5,7 @@ import App from './App';
 describe('Cardmember Web App Component', () => {
   it('renders the Cardmember Web navigation bar', () => {
     render(<App />);
-    expect(screen.getByText('DisputeHub')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === 'DisputeHub')).toBeInTheDocument();
   });
 
   it('renders the transaction history view by default', () => {

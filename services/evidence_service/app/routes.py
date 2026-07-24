@@ -46,6 +46,23 @@ async def upload_evidence(dispute_id: str, file: UploadFile = File(...), evidenc
     STORE.evidence[evidence.id] = evidence
     STORE.evidence_blobs[evidence.id] = (raw, mime_type)
     record_audit_event("EVIDENCE_SUBMITTED", str(dispute.id), str(submitted_by), side.value, {"evidence_type": evidence_type.value, "content_hash": content_hash})
+
+    # DYNAMIC STATE MACHINE PROGRESSION
+    from ...common.schemas import DisputeStatus
+    if dispute.status == DisputeStatus.FILED:
+        dispute.status = DisputeStatus.EVIDENCE_COLLECTION
+
+    # If merchant uploads counter-evidence, move to UNDER_REVIEW and trigger AI Rule Engine evaluation
+    if side == EvidenceSide.MERCHANT or len([e for e in STORE.evidence.values() if e.dispute_id == dispute.id]) >= 2:
+        dispute.status = DisputeStatus.UNDER_REVIEW
+        from ...dispute_service.app.services import DisputeService
+        from ...rule_engine.app.evaluator import RuleEvaluator
+        evaluator = RuleEvaluator()
+        dispute_dict = dispute.model_dump()
+        evidence_items = [e.model_dump() for e in STORE.evidence.values() if e.dispute_id == dispute.id]
+        res = evaluator.evaluate(dispute_dict, evidence_items)
+        DisputeService().issue_verdict(dispute.id, res.outcome, res.explanation, res.rules_fired, res.confidence)
+
     STORE.sync_to_db()
     return evidence.model_dump()
 

@@ -6,4 +6,5 @@ from ...common.database import STORE
 
 
 def handle_dispute_lifecycle(event: dict[str, object]) -> None:
-    STORE.audit_events.append({"subscriber": "audit-service", **event})
+    # Audit log entry recorded via record_audit_event in common.events
+    pass

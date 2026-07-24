@@ -9,6 +9,108 @@ import {
   sendMediatedRequest,
 } from '../api/client';
 
+// Helper component to render PDF files, Images, or Text evidence interactively
+function EvidenceDocumentViewer({ item }: { item: any }) {
+  const isPdf =
+    item.mime_type === 'application/pdf' ||
+    (item.gcs_uri && item.gcs_uri.toLowerCase().endsWith('.pdf')) ||
+    (item.evidence_type && item.evidence_type.includes('PDF')) ||
+    (item.ocr_text && item.ocr_text.startsWith('%PDF'));
+
+  const isImage =
+    (item.mime_type && item.mime_type.startsWith('image/')) ||
+    (item.gcs_uri && /\.(png|jpg|jpeg|gif|webp)$/i.test(item.gcs_uri));
+
+  const hasContentUrl = Boolean(item.content_url);
+  const pdfUrl = hasContentUrl ? `${API_BASE}${item.content_url}` : null;
+
+  return (
+    <div className="bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden shadow-lg">
+      {/* Evidence Header */}
+      <div className="flex justify-between items-center bg-slate-800/90 px-4 py-3 border-b border-slate-700">
+        <div className="flex items-center gap-2">
+          <span className="text-base">{isPdf ? '📄' : isImage ? '🖼️' : '📝'}</span>
+          <span className="font-semibold text-xs text-indigo-300 font-mono">{item.evidence_type}</span>
+          <span className="text-[10px] text-slate-400">({item.side})</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <span>{new Date(item.created_at).toLocaleString()}</span>
+          {pdfUrl && (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-[11px] rounded-lg font-medium transition flex items-center gap-1"
+            >
+              <span>Open PDF ↗</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Embedded Viewers */}
+      <div className="p-4 space-y-3">
+        {/* PDF Embedded Chrome Viewer */}
+        {isPdf ? (
+          <div className="space-y-3">
+            {pdfUrl ? (
+              <div className="rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                <div className="flex justify-between items-center px-3 py-1.5 bg-slate-900 text-[11px] text-slate-400 border-b border-slate-800">
+                  <span>Interactive Chrome PDF Viewer</span>
+                  <span>{item.gcs_uri ? item.gcs_uri.split('/').pop() : 'document.pdf'}</span>
+                </div>
+                <iframe
+                  src={`${pdfUrl}#toolbar=1`}
+                  className="w-full h-[450px] border-0"
+                  title="PDF Evidence Viewer"
+                />
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-lg text-xs space-y-2">
+                <div className="flex items-center gap-2 text-amber-300 font-semibold">
+                  <span>📄 PDF Document Preview</span>
+                </div>
+                {item.ocr_text && !item.ocr_text.startsWith('%PDF') ? (
+                  <p className="text-slate-300 whitespace-pre-wrap font-sans">{item.ocr_text}</p>
+                ) : (
+                  <p className="text-slate-400 italic">PDF Evidence attached (gcs_uri: {item.gcs_uri})</p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : isImage && pdfUrl ? (
+          <div className="flex justify-center bg-slate-950 p-2 rounded-lg border border-slate-800">
+            <img
+              src={pdfUrl}
+              alt={`Evidence ${item.evidence_type}`}
+              className="max-h-96 max-w-full rounded object-contain"
+            />
+          </div>
+        ) : (
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300">
+            <p className="whitespace-pre-wrap font-sans leading-relaxed">{item.ocr_text || 'No text preview available.'}</p>
+          </div>
+        )}
+
+        {/* Extracted Fields Summary (If available) */}
+        {item.extracted_fields && Object.keys(item.extracted_fields).length > 0 && (
+          <div className="bg-indigo-950/30 border border-indigo-500/20 p-3 rounded-lg text-[11px] space-y-1">
+            <span className="font-bold text-indigo-300 uppercase tracking-wider text-[10px]">AI OCR Extracted Details:</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-1">
+              {Object.entries(item.extracted_fields).map(([k, v]) => (
+                <div key={k} className="bg-slate-900/60 p-2 rounded border border-slate-800">
+                  <span className="text-slate-400 capitalize">{k.replace(/_/g, ' ')}:</span>{' '}
+                  <strong className="text-slate-200">{String(v)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DisputeReview() {
   const { disputeId } = useParams<{ disputeId: string }>();
   const [dispute, setDispute] = useState<any | null>(null);
@@ -21,6 +123,13 @@ export default function DisputeReview() {
   const [customMsg, setCustomMsg] = useState('Please upload a photo showing the shipping label attached to the outer box.');
   const [actionNotice, setActionNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Expandable response state for Issue #3
+  const [expandedRequests, setExpandedRequests] = useState<Record<string, boolean>>({});
+
+  const toggleExpandResponse = (id: string) => {
+    setExpandedRequests((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const loadDetail = async () => {
     if (!disputeId) return;
@@ -81,6 +190,8 @@ export default function DisputeReview() {
     return <div className="p-12 text-center text-slate-400">Loading dispute review data...</div>;
   }
 
+  const cardmemberEvidence = evidence.filter((item) => item.side === 'CARDMEMBER');
+
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       {/* Back button & Header */}
@@ -115,32 +226,26 @@ export default function DisputeReview() {
         </div>
       </div>
 
+      {/* ISSUE #1 FIX: Embedded Chrome PDF Viewer Evidence Section */}
       <div className="bg-slate-800/40 border border-slate-700/80 p-6 rounded-2xl space-y-4 shadow-xl">
         <div className="flex justify-between items-center">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Evidence Submitted by Cardmember</h2>
-          <span className="text-xs text-slate-400">{evidence.filter((item) => item.side === 'CARDMEMBER').length} file(s)</span>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Evidence Submitted by Cardmember</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Interactive PDF and document viewers for cardmember evidence files.</p>
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700 font-mono">
+            {cardmemberEvidence.length} file(s)
+          </span>
         </div>
-        {evidence.filter((item) => item.side === 'CARDMEMBER').length === 0 ? (
-          <p className="text-xs text-slate-400">No cardmember evidence has been submitted.</p>
+
+        {cardmemberEvidence.length === 0 ? (
+          <p className="text-xs text-slate-400 py-4 italic text-center border border-dashed border-slate-700/60 rounded-xl">
+            No cardmember evidence has been submitted yet.
+          </p>
         ) : (
-          <div className="space-y-3">
-            {evidence.filter((item) => item.side === 'CARDMEMBER').map((item) => (
-              <div key={item.id} className="bg-slate-900/60 border border-slate-700 p-4 rounded-xl text-xs">
-                <div className="flex justify-between gap-4">
-                  <span className="font-mono text-indigo-300">{item.evidence_type}</span>
-                  <span className="text-slate-500">{new Date(item.created_at).toLocaleString()}</span>
-                </div>
-                {item.mime_type?.startsWith('image/') && item.content_url ? (
-                  <img
-                    src={`${API_BASE}${item.content_url}`}
-                    alt={`Cardmember evidence ${item.evidence_type}`}
-                    className="mt-3 max-h-96 max-w-full rounded-lg border border-slate-700 object-contain"
-                  />
-                ) : item.ocr_text ? (
-                  <p className="mt-2 text-slate-300 whitespace-pre-wrap">{item.ocr_text}</p>
-                ) : null}
-                <p className="mt-2 text-slate-500 font-mono break-all">{item.gcs_uri}</p>
-              </div>
+          <div className="space-y-4">
+            {cardmemberEvidence.map((item) => (
+              <EvidenceDocumentViewer key={item.id} item={item} />
             ))}
           </div>
         )}
@@ -166,7 +271,7 @@ export default function DisputeReview() {
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-400 mb-1">File Document</label>
+              <label className="block text-[11px] text-slate-400 mb-1">File Document (PDF / Image)</label>
               <input
                 type="file"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -256,19 +361,128 @@ export default function DisputeReview() {
         </div>
       </div>
 
+      {/* ISSUE #3 FIX: Interactive, Expandable Cardmember Responses */}
       <div className="bg-slate-800/40 border border-slate-700/80 p-6 rounded-2xl space-y-4 shadow-xl">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Cardmember Responses</h2>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Cardmember Clarification Responses</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Click any response card to expand full clarification details & evidence attachments.</p>
+          </div>
+          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+            {mediatedRequests.filter((r) => r.response_text).length} Responded
+          </span>
+        </div>
+
         {mediatedRequests.filter((request) => request.response_text).length === 0 ? (
-          <p className="text-xs text-slate-400">No cardmember response has been submitted.</p>
+          <p className="text-xs text-slate-400 py-4 italic text-center border border-dashed border-slate-700/60 rounded-xl">
+            No cardmember response has been submitted yet.
+          </p>
         ) : (
           <div className="space-y-3">
-            {mediatedRequests.filter((request) => request.response_text).map((request) => (
-              <div key={request.id} className="bg-slate-900/60 border border-emerald-500/20 p-4 rounded-xl text-xs">
-                <p className="text-slate-400">Response to {request.request_type}</p>
-                <p className="mt-2 text-slate-200">{request.response_text}</p>
-                {request.responded_at && <p className="mt-2 text-slate-500">{new Date(request.responded_at).toLocaleString()}</p>}
-              </div>
-            ))}
+            {mediatedRequests
+              .filter((request) => request.response_text)
+              .map((request) => {
+                const isExpanded = Boolean(expandedRequests[request.id]);
+                const requestTitle =
+                  request.request_type === 'REQUEST_PHOTO_PACKAGING'
+                    ? 'Photo of Received Package Condition'
+                    : request.request_type === 'REQUEST_DELIVERY_CLARIFICATION'
+                    ? 'Clarification of Delivery Location'
+                    : request.request_type;
+
+                return (
+                  <div
+                    key={request.id}
+                    className={`border rounded-xl transition-all duration-200 overflow-hidden ${
+                      isExpanded
+                        ? 'bg-slate-900 border-indigo-500/60 shadow-xl'
+                        : 'bg-slate-900/60 border-emerald-500/30 hover:border-emerald-500/60 cursor-pointer'
+                    }`}
+                  >
+                    {/* Clickable Header */}
+                    <div
+                      onClick={() => toggleExpandResponse(request.id)}
+                      className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 text-xs">
+                          💬
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs text-white">{requestTitle}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              RESPONDED
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-1 line-clamp-1">
+                            "{request.response_text}"
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {request.responded_at && (
+                          <span className="text-[11px] text-slate-500 hidden sm:inline">
+                            {new Date(request.responded_at).toLocaleString()}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition"
+                        >
+                          {isExpanded ? 'Collapse ▴' : 'Expand Details ▾'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Detailed Drawer View */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-800 p-5 bg-slate-950/80 space-y-4">
+                        {/* Original Request Info */}
+                        <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Original Merchant Request:</span>
+                          <p className="text-xs text-slate-300 italic">"{request.message}"</p>
+                          <span className="text-[10px] text-slate-500 block pt-1">
+                            Sent Date: {new Date(request.created_at).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Full Cardmember Response */}
+                        <div className="bg-emerald-950/20 border border-emerald-500/30 p-4 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
+                              Cardmember Response Statement:
+                            </span>
+                            {request.responded_at && (
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(request.responded_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-100 font-sans leading-relaxed">
+                            {request.response_text}
+                          </p>
+                        </div>
+
+                        {/* Related Cardmember Evidence Files */}
+                        {cardmemberEvidence.length > 0 && (
+                          <div className="space-y-3 pt-2">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Attached Evidence Files ({cardmemberEvidence.length}):
+                            </span>
+                            <div className="space-y-3">
+                              {cardmemberEvidence.map((item) => (
+                                <EvidenceDocumentViewer key={item.id} item={item} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
