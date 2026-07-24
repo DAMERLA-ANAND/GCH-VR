@@ -104,6 +104,51 @@ CREATE TABLE IF NOT EXISTS mediated_requests (
     FOREIGN KEY(requested_by) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    transaction_ref TEXT NOT NULL UNIQUE,
+    merchant_name TEXT NOT NULL,
+    amount REAL NOT NULL CHECK (amount > 0),
+    currency TEXT NOT NULL DEFAULT 'USD',
+    posted_at TEXT NOT NULL,
+    description TEXT NOT NULL,
+    mcc TEXT NOT NULL DEFAULT '5732',
+    category TEXT,
+    dispute_id TEXT,
+    status TEXT NOT NULL DEFAULT 'POSTED',
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(dispute_id) REFERENCES disputes(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    dispute_id TEXT,
+    event_type TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    delivery_status TEXT NOT NULL DEFAULT 'SENT',
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(dispute_id) REFERENCES disputes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY,
+    dispute_id TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    actor_type TEXT NOT NULL,
+    action TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    FOREIGN KEY(dispute_id) REFERENCES disputes(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY,
     dispute_id TEXT NOT NULL,
@@ -132,3 +177,6 @@ CREATE INDEX IF NOT EXISTS idx_evidence_dispute_side ON evidence (dispute_id, si
 CREATE INDEX IF NOT EXISTS idx_disputes_deadline_status ON disputes (evidence_deadline, status);
 CREATE INDEX IF NOT EXISTS idx_mediated_requests_dispute_status ON mediated_requests (dispute_id, status);
 CREATE INDEX IF NOT EXISTS idx_messages_dispute_created_at ON messages (dispute_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_posted_at ON transactions (user_id, posted_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created_at ON notifications (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_dispute_timestamp ON audit_logs (dispute_id, timestamp);

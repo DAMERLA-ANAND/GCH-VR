@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   fetchDisputeDetail,
+  fetchDisputeEvidence,
+  fetchMediatedRequests,
+  API_BASE,
   uploadMerchantEvidence,
   sendMediatedRequest,
 } from '../api/client';
@@ -9,6 +12,8 @@ import {
 export default function DisputeReview() {
   const { disputeId } = useParams<{ disputeId: string }>();
   const [dispute, setDispute] = useState<any | null>(null);
+  const [evidence, setEvidence] = useState<any[]>([]);
+  const [mediatedRequests, setMediatedRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [evidenceType, setEvidenceType] = useState('TRACKING');
@@ -23,6 +28,12 @@ export default function DisputeReview() {
       setLoading(true);
       const res = await fetchDisputeDetail(disputeId);
       setDispute(res);
+      const [evidenceRes, mediatedRes] = await Promise.all([
+        fetchDisputeEvidence(disputeId),
+        fetchMediatedRequests(disputeId),
+      ]);
+      setEvidence(evidenceRes.items || []);
+      setMediatedRequests(mediatedRes.items || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -102,6 +113,37 @@ export default function DisputeReview() {
           <p className="italic">"{dispute.description || 'No description provided.'}"</p>
           <p className="text-[11px] text-slate-400 mt-2">Filed Date: {new Date(dispute.filed_at).toLocaleString()}</p>
         </div>
+      </div>
+
+      <div className="bg-slate-800/40 border border-slate-700/80 p-6 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Evidence Submitted by Cardmember</h2>
+          <span className="text-xs text-slate-400">{evidence.filter((item) => item.side === 'CARDMEMBER').length} file(s)</span>
+        </div>
+        {evidence.filter((item) => item.side === 'CARDMEMBER').length === 0 ? (
+          <p className="text-xs text-slate-400">No cardmember evidence has been submitted.</p>
+        ) : (
+          <div className="space-y-3">
+            {evidence.filter((item) => item.side === 'CARDMEMBER').map((item) => (
+              <div key={item.id} className="bg-slate-900/60 border border-slate-700 p-4 rounded-xl text-xs">
+                <div className="flex justify-between gap-4">
+                  <span className="font-mono text-indigo-300">{item.evidence_type}</span>
+                  <span className="text-slate-500">{new Date(item.created_at).toLocaleString()}</span>
+                </div>
+                {item.mime_type?.startsWith('image/') && item.content_url ? (
+                  <img
+                    src={`${API_BASE}${item.content_url}`}
+                    alt={`Cardmember evidence ${item.evidence_type}`}
+                    className="mt-3 max-h-96 max-w-full rounded-lg border border-slate-700 object-contain"
+                  />
+                ) : item.ocr_text ? (
+                  <p className="mt-2 text-slate-300 whitespace-pre-wrap">{item.ocr_text}</p>
+                ) : null}
+                <p className="mt-2 text-slate-500 font-mono break-all">{item.gcs_uri}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Upload Counter-Evidence Form */}
@@ -193,8 +235,9 @@ export default function DisputeReview() {
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Note to Cardmember (Platform Monitored):</label>
+          <label htmlFor="mediated-note" className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Note to Cardmember (Platform Monitored):</label>
           <textarea
+            id="mediated-note"
             rows={3}
             value={customMsg}
             onChange={(e) => setCustomMsg(e.target.value)}
@@ -211,6 +254,23 @@ export default function DisputeReview() {
             Send Mediated Request
           </button>
         </div>
+      </div>
+
+      <div className="bg-slate-800/40 border border-slate-700/80 p-6 rounded-2xl space-y-4 shadow-xl">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Cardmember Responses</h2>
+        {mediatedRequests.filter((request) => request.response_text).length === 0 ? (
+          <p className="text-xs text-slate-400">No cardmember response has been submitted.</p>
+        ) : (
+          <div className="space-y-3">
+            {mediatedRequests.filter((request) => request.response_text).map((request) => (
+              <div key={request.id} className="bg-slate-900/60 border border-emerald-500/20 p-4 rounded-xl text-xs">
+                <p className="text-slate-400">Response to {request.request_type}</p>
+                <p className="mt-2 text-slate-200">{request.response_text}</p>
+                {request.responded_at && <p className="mt-2 text-slate-500">{new Date(request.responded_at).toLocaleString()}</p>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

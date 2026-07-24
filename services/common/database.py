@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import sqlite3
@@ -14,6 +14,7 @@ from .schemas import (
     Appeal,
     AppealOutcome,
     AppealStatus,
+    AuditLogRecord,
     Dispute,
     DisputeCategory,
     DisputeStatus,
@@ -24,6 +25,8 @@ from .schemas import (
     HoldStatus,
     MediatedRequest,
     Message,
+    NotificationRecord,
+    TransactionRecord,
     RuleSet,
     User,
     UserRole,
@@ -40,40 +43,51 @@ class InMemoryStore:
         self.users: dict[UUID, User] = {}
         self.disputes: dict[UUID, Dispute] = {}
         self.evidence: dict[UUID, EvidenceRecord] = {}
+        self.evidence_blobs: dict[UUID, tuple[bytes, str]] = {}
         self.verdicts: dict[UUID, Verdict] = {}
         self.appeals: dict[UUID, Appeal] = {}
         self.funds_holds: dict[UUID, FundsHold] = {}
         self.messages: dict[UUID, Message] = {}
         self.mediated_requests: dict[UUID, MediatedRequest] = {}
+        self.transactions: dict[UUID, TransactionRecord] = {}
+        self.notifications: dict[UUID, NotificationRecord] = {}
+        self.audit_logs: dict[UUID, AuditLogRecord] = {}
         self.audit_events: list[dict[str, Any]] = []
         self.rule_sets: dict[DisputeCategory, RuleSet] = {}
         self.transaction_map: dict[str, UUID] = {}
-        self.current_time: datetime = datetime.utcnow()
+        self.current_time: datetime = datetime.now(timezone.utc)
         self.seed_defaults()
         self.sync_to_db()
 
     def seed_defaults(self) -> None:
         if self.users:
             return
+        self.transactions.clear()
+        self.notifications.clear()
+        self.audit_logs.clear()
         cardmember = User(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
             type=UserRole.CARDMEMBER,
             email="alice@example.com",
             display_name="Alice Cardmember",
             firebase_uid="firebase_uid_cardmember",
         )
         merchant = User(
+            id=UUID("00000000-0000-0000-0000-000000000002"),
             type=UserRole.MERCHANT,
             email="merchant_techstore@example.com",
             display_name="TechStore Merchant",
             firebase_uid="firebase_uid_merchant",
         )
         reviewer = User(
+            id=UUID("00000000-0000-0000-0000-000000000003"),
             type=UserRole.REVIEWER,
             email="reviewer_bob@example.com",
             display_name="Bob Reviewer",
             firebase_uid="firebase_uid_reviewer",
         )
         admin = User(
+            id=UUID("00000000-0000-0000-0000-000000000004"),
             type=UserRole.ADMIN,
             email="admin@example.com",
             display_name="Platform Admin",
@@ -87,6 +101,21 @@ class InMemoryStore:
         self.transaction_map["tok_visa_txn_998877"] = merchant.id
         self.transaction_map["tok_abc123"] = merchant.id
         self.transaction_map["tok_demo_unauthorized"] = merchant.id
+        for transaction_ref, merchant_name, amount, description in [
+            ("tok_visa_txn_998877", "TechStore Online", 149.99, "Ordered sneakers on July 10th."),
+            ("tok_sneaker_001", "Sneaker World", 210.00, "Running shoes purchase."),
+            ("tok_unknown_002", "Unknown Vendor NYC", 89.50, "Unclear point-of-sale charge."),
+            ("tok_air_003", "Airline Tickets", 450.00, "Travel booking charge."),
+            ("tok_coffee_004", "Coffee Shop", 4.75, "Morning coffee purchase."),
+        ]:
+            transaction = TransactionRecord(
+                user_id=cardmember.id,
+                transaction_ref=transaction_ref,
+                merchant_name=merchant_name,
+                amount=amount,
+                description=description,
+            )
+            self.transactions[transaction.id] = transaction
 
     def now(self) -> datetime:
         return self.current_time
@@ -113,6 +142,9 @@ class InMemoryStore:
                 DELETE FROM evidence;
                 DELETE FROM funds_holds;
                 DELETE FROM disputes;
+                DELETE FROM audit_logs;
+                DELETE FROM notifications;
+                DELETE FROM transactions;
                 DELETE FROM users;
                 """
             )
@@ -254,6 +286,67 @@ class InMemoryStore:
                         req.status.value,
                         req.created_at.isoformat(),
                         req.responded_at.isoformat() if req.responded_at else None,
+                    ),
+                )
+
+            for transaction in self.transactions.values():
+                cursor.execute(
+                    """
+                    INSERT INTO transactions (id, user_id, transaction_ref, merchant_name, amount, currency, posted_at, description, mcc, category, dispute_id, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(transaction.id),
+                        str(transaction.user_id),
+                        transaction.transaction_ref,
+                        transaction.merchant_name,
+                        transaction.amount,
+                        transaction.currency,
+                        transaction.posted_at.isoformat(),
+                        transaction.description,
+                        transaction.mcc,
+                        transaction.category.value if transaction.category else None,
+                        str(transaction.dispute_id) if transaction.dispute_id else None,
+                        transaction.status,
+                    ),
+                )
+
+            for notification in self.notifications.values():
+                cursor.execute(
+                    """
+                    INSERT INTO notifications (id, user_id, dispute_id, event_type, channel, subject, body, payload, created_at, delivery_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(notification.id),
+                        str(notification.user_id),
+                        str(notification.dispute_id) if notification.dispute_id else None,
+                        notification.event_type,
+                        notification.channel,
+                        notification.subject,
+                        notification.body,
+                        json.dumps(notification.payload),
+                        notification.created_at.isoformat(),
+                        notification.delivery_status,
+                    ),
+                )
+
+            for audit_log in self.audit_logs.values():
+                cursor.execute(
+                    """
+                    INSERT INTO audit_logs (id, dispute_id, actor_id, actor_type, action, payload, payload_hash, timestamp, environment)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(audit_log.id),
+                        str(audit_log.dispute_id),
+                        audit_log.actor_id,
+                        audit_log.actor_type,
+                        audit_log.action,
+                        json.dumps(audit_log.payload),
+                        audit_log.payload_hash,
+                        audit_log.timestamp.isoformat(),
+                        audit_log.environment,
                     ),
                 )
 

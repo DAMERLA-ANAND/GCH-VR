@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class UserRole(str, Enum):
@@ -85,8 +89,23 @@ class User(BaseModel):
     display_name: str
     firebase_uid: str
     merchant_id: UUID | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TransactionRecord(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    user_id: UUID
+    transaction_ref: str
+    merchant_name: str
+    amount: float
+    currency: str = "USD"
+    posted_at: datetime = Field(default_factory=utc_now)
+    description: str
+    mcc: str = "5732"
+    category: DisputeCategory | None = None
+    dispute_id: UUID | None = None
+    status: str = "POSTED"
 
 
 class DisputeCreateRequest(BaseModel):
@@ -114,12 +133,12 @@ class Dispute(BaseModel):
     amount: float
     currency: str = "USD"
     description: str
-    filed_at: datetime = Field(default_factory=datetime.utcnow)
+    filed_at: datetime = Field(default_factory=utc_now)
     evidence_deadline: datetime
     resolved_at: datetime | None = None
     rule_set_version: str = "v1.0"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class DisputeSummary(BaseModel):
@@ -142,7 +161,7 @@ class Verdict(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     issued_by: VerdictIssuer = VerdictIssuer.SYSTEM
     reviewer_id: UUID | None = None
-    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    issued_at: datetime = Field(default_factory=utc_now)
 
 
 class Appeal(BaseModel):
@@ -154,7 +173,7 @@ class Appeal(BaseModel):
     reviewer_id: UUID | None = None
     review_notes: str | None = None
     appeal_outcome: AppealOutcome | None = None
-    filed_at: datetime = Field(default_factory=datetime.utcnow)
+    filed_at: datetime = Field(default_factory=utc_now)
     resolved_at: datetime | None = None
 
 
@@ -186,8 +205,33 @@ class MediatedRequest(BaseModel):
     response_text: str | None = None
     response_gcs_uri: str | None = None
     status: MediatedRequestStatus = MediatedRequestStatus.PENDING
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     responded_at: datetime | None = None
+
+
+class NotificationRecord(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    user_id: UUID
+    dispute_id: UUID | None = None
+    event_type: str
+    channel: str
+    subject: str
+    body: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    delivery_status: str = "SENT"
+
+
+class AuditLogRecord(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    dispute_id: UUID
+    actor_id: str
+    actor_type: str
+    action: str
+    payload: dict[str, Any]
+    payload_hash: str
+    timestamp: datetime = Field(default_factory=utc_now)
+    environment: str = "prototype-gcp"
 
 
 class EvidenceCreateResponse(BaseModel):
@@ -213,7 +257,7 @@ class EvidenceRecord(BaseModel):
     content_hash: str
     ocr_text: str | None = None
     extracted_fields: dict[str, Any] | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class Message(BaseModel):
@@ -221,7 +265,7 @@ class Message(BaseModel):
     dispute_id: UUID
     sender_id: UUID
     content: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class FundsHold(BaseModel):
@@ -231,7 +275,7 @@ class FundsHold(BaseModel):
     currency: str = "USD"
     status: HoldStatus = HoldStatus.HELD
     external_hold_ref: str
-    held_at: datetime = Field(default_factory=datetime.utcnow)
+    held_at: datetime = Field(default_factory=utc_now)
     released_at: datetime | None = None
 
 
@@ -295,7 +339,7 @@ class ProblemDetail(BaseModel):
     detail: str
     code: str
     instance: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     invalid_params: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -314,7 +358,7 @@ class AuditEvent(BaseModel):
     action: str
     payload: dict[str, Any]
     payload_hash: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     environment: str = "prototype-gcp"
 
 

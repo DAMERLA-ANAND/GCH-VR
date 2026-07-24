@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 export const merchantUserId = '00000000-0000-0000-0000-000000000002';
 export const reviewerUserId = '00000000-0000-0000-0000-000000000003';
@@ -29,6 +29,18 @@ export const fetchMerchantDisputes = async (status?: string, category?: string) 
 export const fetchDisputeDetail = async (id: string) => {
   const client = getMerchantClient('MERCHANT');
   const res = await client.get(`/api/v1/disputes/${id}`);
+  return res.data;
+};
+
+export const fetchDisputeEvidence = async (id: string) => {
+  const client = getMerchantClient('MERCHANT');
+  const res = await client.get(`/api/v1/disputes/${id}/evidence`);
+  return res.data;
+};
+
+export const fetchMediatedRequests = async (id: string) => {
+  const client = getMerchantClient('MERCHANT');
+  const res = await client.get(`/api/v1/disputes/${id}/mediated-requests`);
   return res.data;
 };
 
